@@ -9,6 +9,8 @@ import com.jetbrains.python.psi.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.math.BigInteger;
+
 public class PyConstantExpression extends PyInspection {
 
     @NotNull
@@ -37,6 +39,49 @@ public class PyConstantExpression extends PyInspection {
             final PyExpression condition = pyIfPart.getCondition();
             if (condition instanceof PyBoolLiteralExpression) {
                 registerProblem(condition, "The condition is always " + ((PyBoolLiteralExpression) condition).getValue());
+            } else if (condition instanceof PyBinaryExpression) {
+                PyBinaryExpression binaryExpression = (PyBinaryExpression) condition;
+
+                if (binaryExpression.getLeftExpression() instanceof PyNumericLiteralExpression &&
+                        binaryExpression.getRightExpression() instanceof PyNumericLiteralExpression) {
+                    PyNumericLiteralExpression leftNumberExpression = (PyNumericLiteralExpression) binaryExpression.getLeftExpression();
+                    PyNumericLiteralExpression rightNumberExpression = (PyNumericLiteralExpression) binaryExpression.getRightExpression();
+                    PyElementType operator = (binaryExpression).getOperator();
+
+                    if (operator != null &&
+                            leftNumberExpression.isIntegerLiteral() && rightNumberExpression.isIntegerLiteral()) {
+                        String comparisonOperatorName = operator.getSpecialMethodName();
+                        BigInteger leftNumber = leftNumberExpression.getBigIntegerValue();
+                        BigInteger rightNumber = rightNumberExpression.getBigIntegerValue();
+
+                        if (comparisonOperatorName != null && leftNumber != null && rightNumber != null) {
+                            Boolean valueOfConstantExpression = null;
+                            switch (comparisonOperatorName) {
+                                case "__lt__":
+                                    valueOfConstantExpression = leftNumber.compareTo(rightNumber) < 0;
+                                    break;
+                                case "__gt__":
+                                    valueOfConstantExpression = leftNumber.compareTo(rightNumber) > 0;
+                                    break;
+                                case "__le__":
+                                    valueOfConstantExpression = leftNumber.compareTo(rightNumber) <= 0;
+                                    break;
+                                case "__ge__":
+                                    valueOfConstantExpression = leftNumber.compareTo(rightNumber) >= 0;
+                                    break;
+                                case "__eq__":
+                                    valueOfConstantExpression = leftNumber.compareTo(rightNumber) == 0;
+                                    break;
+                                case "__ne__":
+                                    valueOfConstantExpression = leftNumber.compareTo(rightNumber) != 0;
+                                    break;
+                            }
+                            if (valueOfConstantExpression != null) {
+                                registerProblem(condition, "The condition is always " + valueOfConstantExpression);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
