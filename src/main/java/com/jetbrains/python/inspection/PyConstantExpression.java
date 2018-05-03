@@ -9,7 +9,7 @@ import com.jetbrains.python.psi.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.math.BigInteger;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,10 +27,10 @@ public class PyConstantExpression extends PyInspection {
     }
 
     private static class Visitor extends PyInspectionVisitor {
-        private static final Map<PyElementType, BiFunction<BigInteger, BigInteger, Boolean>> integerComparisonOperatorsFunctions;
+        private static final Map<PyElementType, BiFunction<BigDecimal, BigDecimal, Boolean>> decimalComparisonOperatorsFunctions;
 
         static {
-            Map<PyElementType, BiFunction<BigInteger, BigInteger, Boolean>> mapForInitialization = new HashMap<>();
+            Map<PyElementType, BiFunction<BigDecimal, BigDecimal, Boolean>> mapForInitialization = new HashMap<>();
             mapForInitialization.put(LT, (leftNumber, rightNumber) -> leftNumber.compareTo(rightNumber) < 0);
             mapForInitialization.put(GT, (leftNumber, rightNumber) -> leftNumber.compareTo(rightNumber) > 0);
             mapForInitialization.put(LE, (leftNumber, rightNumber) -> leftNumber.compareTo(rightNumber) <= 0);
@@ -38,7 +38,7 @@ public class PyConstantExpression extends PyInspection {
             mapForInitialization.put(EQEQ, (leftNumber, rightNumber) -> leftNumber.compareTo(rightNumber) == 0);
             mapForInitialization.put(NE, (leftNumber, rightNumber) -> leftNumber.compareTo(rightNumber) != 0);
             mapForInitialization.put(NE_OLD, (leftNumber, rightNumber) -> leftNumber.compareTo(rightNumber) != 0);
-            integerComparisonOperatorsFunctions = Collections.unmodifiableMap(mapForInitialization);
+            decimalComparisonOperatorsFunctions = Collections.unmodifiableMap(mapForInitialization);
         }
 
         private Visitor(@Nullable ProblemsHolder holder, @NotNull LocalInspectionToolSession session) {
@@ -60,13 +60,13 @@ public class PyConstantExpression extends PyInspection {
                 registerProblem(condition, "The condition is always " + ((PyBoolLiteralExpression) condition).getValue());
             } else if (condition instanceof PyBinaryExpression) {
                 PyBinaryExpression binaryExpression = (PyBinaryExpression) condition;
-                BigInteger leftNumber = getIntegerNumber(binaryExpression.getLeftExpression());
-                BigInteger rightNumber = getIntegerNumber(binaryExpression.getRightExpression());
+                BigDecimal leftNumber = getDecimalNumber(binaryExpression.getLeftExpression());
+                BigDecimal rightNumber = getDecimalNumber(binaryExpression.getRightExpression());
                 PyElementType operator = (binaryExpression).getOperator();
 
                 if (leftNumber != null && rightNumber != null) {
-                    if (integerComparisonOperatorsFunctions.containsKey(operator)) {
-                        Boolean valueOfConstantExpression = integerComparisonOperatorsFunctions.get(operator).
+                    if (decimalComparisonOperatorsFunctions.containsKey(operator)) {
+                        Boolean valueOfConstantExpression = decimalComparisonOperatorsFunctions.get(operator).
                                 apply(leftNumber, rightNumber);
                         registerProblem(condition, "The condition is always " + valueOfConstantExpression);
                     }
@@ -75,22 +75,18 @@ public class PyConstantExpression extends PyInspection {
         }
 
         @Nullable
-        private BigInteger getIntegerNumber(PyExpression expression) {
+        private BigDecimal getDecimalNumber(PyExpression expression) {
             if (expression instanceof PyNumericLiteralExpression) {
                 PyNumericLiteralExpression numberExpression = (PyNumericLiteralExpression) expression;
-                if (numberExpression.isIntegerLiteral()) {
-                    return numberExpression.getBigIntegerValue();
-                }
+                return numberExpression.getBigDecimalValue();
             } else if (expression instanceof PyPrefixExpression) {
                 PyPrefixExpression prefixExpression = (PyPrefixExpression) expression;
                 if (prefixExpression.getOperator().equals(MINUS) &&
                         prefixExpression.getOperand() instanceof PyNumericLiteralExpression) {
                     PyNumericLiteralExpression numberExpression = (PyNumericLiteralExpression) prefixExpression.getOperand();
-                    if (numberExpression.isIntegerLiteral()) {
-                        BigInteger integer = numberExpression.getBigIntegerValue();
-                        if (integer != null) {
-                            return integer.negate();
-                        }
+                    BigDecimal decimal = numberExpression.getBigDecimalValue();
+                    if (decimal != null) {
+                        return decimal.negate();
                     }
                 }
             }
